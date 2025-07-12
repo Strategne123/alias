@@ -129,8 +129,30 @@
         
         .scoreboard {
             display: flex;
-            justify-content: space-around;
+            flex-direction: column;
+            gap: 10px;
             margin: 20px 0;
+        }
+        
+        .scoreboard.compact {
+            gap: 5px;
+        }
+        
+        .player-score {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 15px;
+            border-radius: 20px;
+            background-color: #ecf0f1;
+        }
+        
+        .player-score .name {
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 70%;
         }
         
         .team-score {
@@ -199,6 +221,22 @@
             margin-top: 5px;
         }
         
+        .select-all-categories {
+            grid-column: 1 / -1;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .full-results-btn {
+            display: block;
+            margin: 10px auto;
+            background-color: #9b59b6;
+        }
+        
+        .full-results-btn:hover {
+            background-color: #8e44ad;
+        }
+        
         @media (max-width: 600px) {
             .teams-container {
                 flex-direction: column;
@@ -215,6 +253,11 @@
             .timer {
                 font-size: 36px;
             }
+            
+            .player-score {
+                padding: 6px 10px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -226,7 +269,7 @@
         <div id="playerSetupScreen" class="screen active">
             <h2>Добавьте игроков</h2>
             <div>
-                <input type="text" id="playerNameInput" placeholder="Введите имя игрока">
+                <input type="text" id="playerNameInput" placeholder="Введите имя игрока" autofocus>
                 <button id="addPlayerBtn">Добавить</button>
             </div>
             <div class="player-list" id="playerList"></div>
@@ -265,14 +308,18 @@
             <div class="category-select" id="categorySelect">
                 <!-- Categories will be loaded from JSON -->
             </div>
+            <div class="select-all-categories">
+                <button id="toggleAllCategoriesBtn">Выбрать все</button>
+            </div>
             <button id="startGameBtn">Начать игру</button>
         </div>
         
         <!-- Game Screen -->
         <div id="gameScreen" class="screen">
-            <div class="scoreboard" id="scoreboard">
+            <div class="scoreboard compact" id="scoreboard">
                 <!-- Scores will be displayed here -->
             </div>
+            <button id="showFullResultsBtn" class="full-results-btn" style="display: none;">Показать полные результаты</button>
             <div class="current-players" id="currentPlayers">
                 <!-- Current players will be displayed here -->
             </div>
@@ -280,7 +327,7 @@
             <div class="word-display" id="wordDisplay"></div>
             <div style="text-align: center;">
                 <button id="correctBtn" class="btn-success">Правильно (+1)</button>
-                <button id="skipBtn" class="btn-danger">Пропустить</button>
+                <button id="skipBtn" class="btn-danger">Пропустить (-1)</button>
             </div>
         </div>
         
@@ -290,6 +337,7 @@
                 <h2>Игра завершена!</h2>
                 <p>Победитель:</p>
                 <div class="winner-name" id="winnerName"></div>
+                <div class="scoreboard" id="finalScoreboard"></div>
                 <button id="playAgainBtn">Играть снова</button>
             </div>
         </div>
@@ -316,7 +364,8 @@
             currentExplainer: null,
             currentGuesser: null,
             currentTeam: null,
-            roundsPerPlayer: 0
+            roundsPerPlayer: 0,
+            showFullResults: false
         };
 
         // DOM elements
@@ -333,8 +382,11 @@
             team1: document.getElementById('team1'),
             team2: document.getElementById('team2'),
             categorySelect: document.getElementById('categorySelect'),
+            toggleAllCategoriesBtn: document.getElementById('toggleAllCategoriesBtn'),
             startGameBtn: document.getElementById('startGameBtn'),
             scoreboard: document.getElementById('scoreboard'),
+            showFullResultsBtn: document.getElementById('showFullResultsBtn'),
+            finalScoreboard: document.getElementById('finalScoreboard'),
             currentPlayers: document.getElementById('currentPlayers'),
             timer: document.getElementById('timer'),
             wordDisplay: document.getElementById('wordDisplay'),
@@ -360,11 +412,18 @@
                 if (e.key === 'Enter') addPlayer();
             });
             
+            // Keep focus on input after adding player
+            elements.addPlayerBtn.addEventListener('click', () => {
+                elements.playerNameInput.focus();
+            });
+            
             elements.nextToCategoriesBtn.addEventListener('click', showCategoryScreen);
             elements.startGameBtn.addEventListener('click', startGame);
+            elements.toggleAllCategoriesBtn.addEventListener('click', toggleAllCategories);
             elements.correctBtn.addEventListener('click', wordGuessed);
             elements.skipBtn.addEventListener('click', skipWord);
             elements.playAgainBtn.addEventListener('click', resetGame);
+            elements.showFullResultsBtn.addEventListener('click', toggleFullResults);
             
             // Game mode change
             elements.gameModeRadios.forEach(radio => {
@@ -394,6 +453,27 @@
             } catch (error) {
                 console.error('Ошибка загрузки категорий:', error);
                 alert('Ошибка загрузки категорий. Пожалуйста, убедитесь, что файл categories.json существует и содержит правильные данные.');
+            }
+        }
+
+        // Toggle all categories selection
+        function toggleAllCategories() {
+            const allSelected = gameState.selectedCategories.length === Object.keys(gameState.categories).length;
+            
+            if (allSelected) {
+                // Deselect all
+                gameState.selectedCategories = [];
+                document.querySelectorAll('.category-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                elements.toggleAllCategoriesBtn.textContent = 'Выбрать все';
+            } else {
+                // Select all
+                gameState.selectedCategories = Object.keys(gameState.categories);
+                document.querySelectorAll('.category-btn').forEach(btn => {
+                    btn.classList.add('selected');
+                });
+                elements.toggleAllCategoriesBtn.textContent = 'Снять выделение';
             }
         }
 
@@ -531,6 +611,9 @@
                 
                 // Update rounds input validation
                 updateRoundsInput();
+                
+                // Keep focus on input
+                elements.playerNameInput.focus();
             }
         }
 
@@ -551,8 +634,19 @@
                 btn.className = 'category-btn';
                 btn.textContent = category;
                 btn.addEventListener('click', () => toggleCategorySelection(category));
+                
+                // Select by default if already selected
+                if (gameState.selectedCategories.includes(category)) {
+                    btn.classList.add('selected');
+                }
+                
                 elements.categorySelect.appendChild(btn);
             });
+            
+            // Update toggle all button text
+            elements.toggleAllCategoriesBtn.textContent = 
+                gameState.selectedCategories.length === Object.keys(gameState.categories).length ? 
+                'Снять выделение' : 'Выбрать все';
         }
 
         // Toggle category selection
@@ -565,6 +659,11 @@
                 gameState.selectedCategories.splice(index, 1);
                 event.target.classList.remove('selected');
             }
+            
+            // Update toggle all button text
+            elements.toggleAllCategoriesBtn.textContent = 
+                gameState.selectedCategories.length === Object.keys(gameState.categories).length ? 
+                'Снять выделение' : 'Выбрать все';
         }
 
         // Start the game
@@ -634,12 +733,34 @@
             elements.scoreboard.innerHTML = '';
             
             if (gameState.gameMode === 'individual') {
-                gameState.players.forEach(player => {
-                    const scoreElement = document.createElement('div');
-                    scoreElement.className = 'team-score';
-                    scoreElement.innerHTML = `<h3>${player}</h3><p>${gameState.score[player] || 0} очков</p>`;
-                    elements.scoreboard.appendChild(scoreElement);
+                // Sort players by score
+                const sortedPlayers = [...gameState.players].sort((a, b) => {
+                    return (gameState.score[b] || 0) - (gameState.score[a] || 0);
                 });
+                
+                // Show only top 3 in compact mode
+                if (!gameState.showFullResults && sortedPlayers.length > 3) {
+                    for (let i = 0; i < 3; i++) {
+                        addPlayerToScoreboard(sortedPlayers[i]);
+                    }
+                    
+                    // Add ellipsis
+                    const ellipsis = document.createElement('div');
+                    ellipsis.className = 'player-score';
+                    ellipsis.textContent = '...';
+                    elements.scoreboard.appendChild(ellipsis);
+                    
+                    // Show toggle button
+                    elements.showFullResultsBtn.style.display = 'block';
+                } else {
+                    // Show all players
+                    sortedPlayers.forEach(player => {
+                        addPlayerToScoreboard(player);
+                    });
+                    
+                    // Hide toggle button
+                    elements.showFullResultsBtn.style.display = 'none';
+                }
             } else {
                 ['Команда 1', 'Команда 2'].forEach((team, index) => {
                     const scoreElement = document.createElement('div');
@@ -648,6 +769,29 @@
                     elements.scoreboard.appendChild(scoreElement);
                 });
             }
+        }
+        
+        // Add player to scoreboard
+        function addPlayerToScoreboard(player) {
+            const scoreElement = document.createElement('div');
+            scoreElement.className = 'player-score';
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'name';
+            nameSpan.textContent = player;
+            
+            const scoreSpan = document.createElement('span');
+            scoreSpan.textContent = gameState.score[player] || 0;
+            
+            scoreElement.appendChild(nameSpan);
+            scoreElement.appendChild(scoreSpan);
+            elements.scoreboard.appendChild(scoreElement);
+        }
+
+        // Toggle full results view
+        function toggleFullResults() {
+            gameState.showFullResults = !gameState.showFullResults;
+            updateScoreboard();
         }
 
         // Select player/team for the current round
@@ -753,7 +897,18 @@
 
         // Word was skipped
         function skipWord() {
-            // Just show the next word
+            // In individual mode, only explainer loses point
+            if (gameState.gameMode === 'individual') {
+                gameState.score[gameState.currentExplainer] = (gameState.score[gameState.currentExplainer] || 0) - 1;
+            } else {
+                // In team mode, team loses point
+                gameState.score[gameState.currentTeam] = (gameState.score[gameState.currentTeam] || 0) - 1;
+            }
+            
+            // Update scoreboard
+            updateScoreboard();
+            
+            // Show next word
             showNextWord();
         }
 
@@ -783,16 +938,42 @@
             let winner;
             let maxScore = -1;
             
+            // Create final scoreboard
+            elements.finalScoreboard.innerHTML = '';
+            
             if (gameState.gameMode === 'individual') {
-                // Find player with highest score
-                gameState.players.forEach(player => {
-                    if (gameState.score[player] > maxScore) {
-                        maxScore = gameState.score[player];
+                // Sort players by score
+                const sortedPlayers = [...gameState.players].sort((a, b) => {
+                    return (gameState.score[b] || 0) - (gameState.score[a] || 0);
+                });
+                
+                // Find winner and build final scoreboard
+                sortedPlayers.forEach(player => {
+                    const score = gameState.score[player] || 0;
+                    
+                    // Check for winner
+                    if (score > maxScore) {
+                        maxScore = score;
                         winner = player;
-                    } else if (gameState.score[player] === maxScore) {
+                    } else if (score === maxScore) {
                         // In case of tie, add the player to winner string
                         winner = `${winner} и ${player}`;
                     }
+                    
+                    // Add to final scoreboard
+                    const playerElement = document.createElement('div');
+                    playerElement.className = 'player-score';
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'name';
+                    nameSpan.textContent = player;
+                    
+                    const scoreSpan = document.createElement('span');
+                    scoreSpan.textContent = score;
+                    
+                    playerElement.appendChild(nameSpan);
+                    playerElement.appendChild(scoreSpan);
+                    elements.finalScoreboard.appendChild(playerElement);
                 });
             } else {
                 // Find winning team
@@ -809,6 +990,14 @@
                     winner = 'Команда 1 и Команда 2 (ничья)';
                     maxScore = team1Score;
                 }
+                
+                // Add teams to final scoreboard
+                ['Команда 1', 'Команда 2'].forEach((team, index) => {
+                    const scoreElement = document.createElement('div');
+                    scoreElement.className = 'team-score';
+                    scoreElement.innerHTML = `<h3>${team}</h3><p>${gameState.teams[index].join(', ')}</p><p>${gameState.score[team] || 0} очков</p>`;
+                    elements.finalScoreboard.appendChild(scoreElement);
+                });
             }
             
             // Show winner screen
@@ -824,6 +1013,7 @@
             gameState.selectedCategories = [];
             gameState.currentTeamIndex = 0;
             gameState.remainingWords = [];
+            gameState.showFullResults = false;
             
             // Clear team selections
             if (gameState.gameMode === 'teams') {
@@ -834,6 +1024,9 @@
             
             elements.winnerScreen.classList.remove('active');
             elements.playerSetupScreen.classList.add('active');
+            
+            // Set focus back to input
+            elements.playerNameInput.focus();
         }
 
         // Initialize the game when the page loads
