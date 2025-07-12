@@ -14,7 +14,7 @@
         }
         
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -93,17 +93,24 @@
             background-color: #d6eaf8;
         }
         
+        .teams-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
         .team {
+            flex: 1;
             min-height: 200px;
             border: 2px dashed #bdc3c7;
             border-radius: 10px;
             padding: 15px;
-            margin-bottom: 20px;
             background-color: #f9f9f9;
         }
         
         .team h3 {
             margin-top: 0;
+            text-align: center;
         }
         
         .word-display {
@@ -186,30 +193,17 @@
             text-align: center;
         }
         
-        .team-selector {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .team-selector-btn {
-            padding: 10px 20px;
-            font-weight: bold;
-        }
-        
-        .team-selector-btn.active {
-            background-color: #2ecc71;
-        }
-        
-        .category-selection-info {
-            text-align: center;
-            margin: 15px 0;
-            font-style: italic;
+        .rounds-info {
+            font-size: 14px;
             color: #7f8c8d;
+            margin-top: 5px;
         }
         
         @media (max-width: 600px) {
+            .teams-container {
+                flex-direction: column;
+            }
+            
             .category-select {
                 grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
             }
@@ -245,22 +239,21 @@
                 </label>
             </div>
             <div id="teamSetup" style="display: none;">
-                <h3>Создайте команды</h3>
-                <div class="team-selector">
-                    <button id="selectTeam1Btn" class="team-selector-btn">Выбрать Команду 1</button>
-                    <button id="selectTeam2Btn" class="team-selector-btn">Выбрать Команду 2</button>
-                </div>
-                <div class="team" id="team1">
-                    <h3>Команда 1</h3>
-                </div>
-                <div class="team" id="team2">
-                    <h3>Команда 2</h3>
+                <h3>Распределение по командам</h3>
+                <div class="teams-container">
+                    <div class="team" id="team1">
+                        <h3>Команда 1</h3>
+                    </div>
+                    <div class="team" id="team2">
+                        <h3>Команда 2</h3>
+                    </div>
                 </div>
             </div>
             <div class="rounds-selector" id="roundsSelector">
                 <h3>Количество раундов:</h3>
                 <input type="number" id="roundsInput" min="1" value="3">
-                <p id="roundsWarning" style="color: red; display: none;">Для нечетного числа игроков выберите четное число раундов</p>
+                <div class="rounds-info" id="roundsInfo"></div>
+                <p id="roundsWarning" style="color: red; display: none;"></p>
             </div>
             <button id="nextToCategoriesBtn" disabled>Продолжить</button>
         </div>
@@ -268,7 +261,7 @@
         <!-- Category Selection Screen -->
         <div id="categoryScreen" class="screen">
             <h2>Выберите категории</h2>
-            <p class="category-selection-info">Выберите одну или несколько категорий. Слова будут браться только из выбранных категорий.</p>
+            <p style="text-align: center;">Выберите одну или несколько категорий. Слова будут браться только из выбранных категорий.</p>
             <div class="category-select" id="categorySelect">
                 <!-- Categories will be loaded from JSON -->
             </div>
@@ -286,7 +279,7 @@
             <div class="timer" id="timer">01:00</div>
             <div class="word-display" id="wordDisplay"></div>
             <div style="text-align: center;">
-                <button id="correctBtn" class="btn-success">Угадано (+1)</button>
+                <button id="correctBtn" class="btn-success">Правильно (+1)</button>
                 <button id="skipBtn" class="btn-danger">Пропустить</button>
             </div>
         </div>
@@ -321,8 +314,9 @@
             totalRounds: 3,
             currentTeamIndex: 0,
             currentExplainer: null,
+            currentGuesser: null,
             currentTeam: null,
-            selectedTeam: 1
+            roundsPerPlayer: 0
         };
 
         // DOM elements
@@ -338,8 +332,6 @@
             teamSetup: document.getElementById('teamSetup'),
             team1: document.getElementById('team1'),
             team2: document.getElementById('team2'),
-            selectTeam1Btn: document.getElementById('selectTeam1Btn'),
-            selectTeam2Btn: document.getElementById('selectTeam2Btn'),
             categorySelect: document.getElementById('categorySelect'),
             startGameBtn: document.getElementById('startGameBtn'),
             scoreboard: document.getElementById('scoreboard'),
@@ -353,6 +345,7 @@
             gameModeRadios: document.getElementsByName('gameMode'),
             roundsInput: document.getElementById('roundsInput'),
             roundsWarning: document.getElementById('roundsWarning'),
+            roundsInfo: document.getElementById('roundsInfo'),
             roundsSelector: document.getElementById('roundsSelector')
         };
 
@@ -378,28 +371,15 @@
                 radio.addEventListener('change', (e) => {
                     gameState.gameMode = e.target.value;
                     elements.teamSetup.style.display = gameState.gameMode === 'teams' ? 'block' : 'none';
+                    if (gameState.gameMode === 'teams' && gameState.players.length > 0) {
+                        autoDistributeTeams();
+                    }
                     updateRoundsInput();
                 });
             });
             
             // Rounds input change
             elements.roundsInput.addEventListener('change', updateRoundsInput);
-            
-            // Team selection buttons
-            elements.selectTeam1Btn.addEventListener('click', () => {
-                gameState.selectedTeam = 1;
-                elements.selectTeam1Btn.classList.add('active');
-                elements.selectTeam2Btn.classList.remove('active');
-            });
-            
-            elements.selectTeam2Btn.addEventListener('click', () => {
-                gameState.selectedTeam = 2;
-                elements.selectTeam2Btn.classList.add('active');
-                elements.selectTeam1Btn.classList.remove('active');
-            });
-            
-            // Initialize team selection
-            elements.selectTeam1Btn.classList.add('active');
         }
 
         // Load categories from JSON file
@@ -417,20 +397,107 @@
             }
         }
 
+        // Automatically distribute players to teams
+        function autoDistributeTeams() {
+            // Clear teams
+            elements.team1.innerHTML = '<h3>Команда 1</h3>';
+            elements.team2.innerHTML = '<h3>Команда 2</h3>';
+            gameState.teams = [[], []];
+            
+            // Shuffle players
+            const shuffledPlayers = [...gameState.players].sort(() => Math.random() - 0.5);
+            
+            // Distribute players
+            shuffledPlayers.forEach((player, index) => {
+                const teamIndex = index % 2;
+                const teamElement = teamIndex === 0 ? elements.team1 : elements.team2;
+                
+                const playerElement = document.createElement('div');
+                playerElement.className = 'player-item';
+                playerElement.textContent = player;
+                playerElement.dataset.name = player;
+                playerElement.addEventListener('click', () => movePlayerToOtherTeam(player));
+                
+                teamElement.appendChild(playerElement);
+                gameState.teams[teamIndex].push(player);
+            });
+            
+            // Enable continue button if we have at least 2 players
+            elements.nextToCategoriesBtn.disabled = gameState.players.length < 2;
+        }
+
+        // Move player to other team
+        function movePlayerToOtherTeam(playerName) {
+            const team1Index = gameState.teams[0].indexOf(playerName);
+            const team2Index = gameState.teams[1].indexOf(playerName);
+            
+            if (team1Index >= 0) {
+                // Move from team 1 to team 2
+                gameState.teams[0].splice(team1Index, 1);
+                gameState.teams[1].push(playerName);
+            } else if (team2Index >= 0) {
+                // Move from team 2 to team 1
+                gameState.teams[1].splice(team2Index, 1);
+                gameState.teams[0].push(playerName);
+            }
+            
+            // Update UI
+            renderTeams();
+        }
+
+        // Render teams in UI
+        function renderTeams() {
+            elements.team1.innerHTML = '<h3>Команда 1</h3>';
+            elements.team2.innerHTML = '<h3>Команда 2</h3>';
+            
+            gameState.teams[0].forEach(player => {
+                const playerElement = document.createElement('div');
+                playerElement.className = 'player-item';
+                playerElement.textContent = player;
+                playerElement.dataset.name = player;
+                playerElement.addEventListener('click', () => movePlayerToOtherTeam(player));
+                elements.team1.appendChild(playerElement);
+            });
+            
+            gameState.teams[1].forEach(player => {
+                const playerElement = document.createElement('div');
+                playerElement.className = 'player-item';
+                playerElement.textContent = player;
+                playerElement.dataset.name = player;
+                playerElement.addEventListener('click', () => movePlayerToOtherTeam(player));
+                elements.team2.appendChild(playerElement);
+            });
+        }
+
         // Update rounds input based on game mode and player count
         function updateRoundsInput() {
-            if (gameState.gameMode === 'individual' && gameState.players.length % 2 !== 0) {
-                // For individual mode with odd number of players, rounds must be even
-                elements.roundsWarning.style.display = 'block';
-                if (elements.roundsInput.value % 2 !== 0) {
-                    elements.roundsInput.value = 2;
-                }
-                elements.roundsInput.min = 2;
-                elements.roundsInput.step = 2;
-            } else {
+            const numPlayers = gameState.players.length;
+            if (numPlayers < 2) {
+                elements.roundsInfo.textContent = '';
                 elements.roundsWarning.style.display = 'none';
+                return;
+            }
+            
+            if (gameState.gameMode === 'individual') {
+                // For individual mode, rounds must be multiple of players (or players*2 for odd counts)
+                const baseRounds = numPlayers % 2 === 0 ? numPlayers : numPlayers * 2;
+                const currentValue = parseInt(elements.roundsInput.value);
+                
+                elements.roundsInput.min = baseRounds;
+                elements.roundsInput.step = baseRounds;
+                
+                if (currentValue % baseRounds !== 0) {
+                    elements.roundsInput.value = baseRounds;
+                }
+                
+                elements.roundsInfo.textContent = `Рекомендуется: ${baseRounds} раундов (каждый игрок объяснит ${numPlayers % 2 === 0 ? 2 : 4} раза)`;
+                elements.roundsWarning.style.display = 'none';
+            } else {
+                // For team mode, any number of rounds is allowed
                 elements.roundsInput.min = 1;
                 elements.roundsInput.step = 1;
+                elements.roundsInfo.textContent = '';
+                elements.roundsWarning.style.display = 'none';
             }
         }
 
@@ -445,9 +512,8 @@
                 playerElement.textContent = name;
                 playerElement.dataset.name = name;
                 
-                // Add click handler for team selection
                 if (gameState.gameMode === 'teams') {
-                    playerElement.addEventListener('click', () => assignPlayerToTeam(name));
+                    playerElement.addEventListener('click', () => movePlayerToOtherTeam(name));
                 }
                 
                 elements.playerList.appendChild(playerElement);
@@ -456,48 +522,15 @@
                 // Enable continue button if we have at least 2 players
                 if (gameState.players.length >= 2) {
                     elements.nextToCategoriesBtn.disabled = false;
+                    
+                    // Auto-distribute teams if in team mode
+                    if (gameState.gameMode === 'teams') {
+                        autoDistributeTeams();
+                    }
                 }
                 
                 // Update rounds input validation
                 updateRoundsInput();
-            }
-        }
-
-        // Assign player to selected team
-        function assignPlayerToTeam(playerName) {
-            // Remove player from both teams first
-            removePlayerFromTeam(playerName, 1);
-            removePlayerFromTeam(playerName, 2);
-            
-            // Add to selected team
-            const teamElement = gameState.selectedTeam === 1 ? elements.team1 : elements.team2;
-            const teamIndex = gameState.selectedTeam - 1;
-            
-            const playerElement = document.createElement('div');
-            playerElement.className = 'player-item';
-            playerElement.textContent = playerName;
-            playerElement.dataset.name = playerName;
-            playerElement.addEventListener('click', () => assignPlayerToTeam(playerName));
-            
-            teamElement.appendChild(playerElement);
-            
-            // Update game state
-            gameState.teams[teamIndex] = Array.from(teamElement.querySelectorAll('.player-item')).map(el => el.dataset.name);
-            
-            // Check if both teams have at least one player
-            const canContinue = gameState.teams[0].length > 0 && gameState.teams[1].length > 0;
-            elements.nextToCategoriesBtn.disabled = !canContinue;
-        }
-
-        // Remove player from team
-        function removePlayerFromTeam(playerName, teamNumber) {
-            const teamIndex = teamNumber - 1;
-            const teamElement = teamNumber === 1 ? elements.team1 : elements.team2;
-            
-            const playerElement = teamElement.querySelector(`[data-name="${playerName}"]`);
-            if (playerElement) {
-                teamElement.removeChild(playerElement);
-                gameState.teams[teamIndex] = gameState.teams[teamIndex].filter(name => name !== playerName);
             }
         }
 
@@ -557,6 +590,8 @@
                 gameState.players.forEach(player => {
                     gameState.score[player] = 0;
                 });
+                // Calculate how many times each player will explain
+                gameState.roundsPerPlayer = (gameState.totalRounds * 2) / gameState.players.length;
             } else {
                 gameState.score = {
                     'Команда 1': 0,
@@ -588,6 +623,10 @@
             
             // Show first word
             showNextWord();
+            
+            // Enable buttons
+            elements.correctBtn.disabled = false;
+            elements.skipBtn.disabled = false;
         }
 
         // Update the scoreboard display
@@ -614,15 +653,18 @@
         // Select player/team for the current round
         function selectPlayerForRound() {
             if (gameState.gameMode === 'individual') {
-                // For individual mode, select 2 random players
+                // For individual mode, select explainer and guesser
                 const availablePlayers = [...gameState.players];
-                const player1Index = Math.floor(Math.random() * availablePlayers.length);
-                const player1 = availablePlayers.splice(player1Index, 1)[0];
-                const player2Index = Math.floor(Math.random() * availablePlayers.length);
-                const player2 = availablePlayers[player2Index];
                 
-                gameState.currentExplainer = player1;
-                elements.currentPlayers.textContent = `${player1} и ${player2} объясняют слова`;
+                // Select explainer
+                const explainerIndex = (gameState.currentRound - 1) % gameState.players.length;
+                gameState.currentExplainer = gameState.players[explainerIndex];
+                
+                // Select guesser (next player in list)
+                const guesserIndex = (explainerIndex + 1) % gameState.players.length;
+                gameState.currentGuesser = gameState.players[guesserIndex];
+                
+                elements.currentPlayers.textContent = `${gameState.currentExplainer} объясняет для ${gameState.currentGuesser}`;
             } else {
                 // For team mode, alternate between teams
                 const teamIndex = gameState.currentTeamIndex;
@@ -695,11 +737,8 @@
             // Update scores
             if (gameState.gameMode === 'individual') {
                 // In individual mode, both players get points
-                gameState.players.forEach(player => {
-                    if (player === gameState.currentExplainer) {
-                        gameState.score[player] = (gameState.score[player] || 0) + 1;
-                    }
-                });
+                gameState.score[gameState.currentExplainer] = (gameState.score[gameState.currentExplainer] || 0) + 1;
+                gameState.score[gameState.currentGuesser] = (gameState.score[gameState.currentGuesser] || 0) + 1;
             } else {
                 // In team mode, add point to current team
                 gameState.score[gameState.currentTeam] = (gameState.score[gameState.currentTeam] || 0) + 1;
@@ -735,8 +774,6 @@
             
             // Start next round after a delay
             setTimeout(() => {
-                elements.correctBtn.disabled = false;
-                elements.skipBtn.disabled = false;
                 startRound();
             }, 3000);
         }
