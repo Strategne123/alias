@@ -411,6 +411,32 @@
             background-color: var(--primary-color);
         }
         
+        .round-info {
+            text-align: center;
+            font-size: 1.2rem;
+            margin: 1rem 0;
+            color: var(--dark-color);
+        }
+        
+        .round-number {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .start-round-screen {
+            text-align: center;
+        }
+        
+        .start-round-info {
+            font-size: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .start-round-player {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -561,8 +587,28 @@
             </div>
         </div>
         
+        <!-- Start Round Screen -->
+        <div id="startRoundScreen" class="screen">
+            <div class="start-round-screen">
+                <h2>Подготовка к раунду</h2>
+                <div class="round-info">
+                    Раунд <span class="round-number" id="currentRoundDisplay">1</span> из <span class="round-number" id="totalRoundsDisplay">5</span>
+                </div>
+                <div class="start-round-info">
+                    <p>Следующий игрок:</p>
+                    <p class="start-round-player" id="nextExplainerName"></p>
+                    <p>будет объяснять слова</p>
+                    <div id="nextGuesserInfo" style="margin-top: 1rem;"></div>
+                </div>
+                <button id="startRoundBtn">Начать раунд</button>
+            </div>
+        </div>
+        
         <!-- Game Screen -->
         <div id="gameScreen" class="screen">
+            <div class="round-info">
+                Раунд <span class="round-number" id="gameRoundDisplay">1</span> из <span class="round-number" id="gameTotalRoundsDisplay">5</span>
+            </div>
             <div class="scoreboard compact" id="scoreboard">
                 <!-- Scores will be displayed here -->
             </div>
@@ -580,8 +626,6 @@
                 <button id="correctBtn" class="btn-success">Правильно (+1)</button>
                 <button id="skipBtn" class="btn-danger">Пропустить (-1)</button>
             </div>
-            
-            <button id="nextRoundBtn" class="next-round-btn" style="display: none;">Следующий раунд</button>
         </div>
         
         <!-- Winner Screen -->
@@ -628,6 +672,7 @@
         const elements = {
             playerSetupScreen: document.getElementById('playerSetupScreen'),
             categoryScreen: document.getElementById('categoryScreen'),
+            startRoundScreen: document.getElementById('startRoundScreen'),
             gameScreen: document.getElementById('gameScreen'),
             winnerScreen: document.getElementById('winnerScreen'),
             playerNameInput: document.getElementById('playerNameInput'),
@@ -640,6 +685,7 @@
             categorySelect: document.getElementById('categorySelect'),
             toggleAllCategoriesBtn: document.getElementById('toggleAllCategoriesBtn'),
             startGameBtn: document.getElementById('startGameBtn'),
+            startRoundBtn: document.getElementById('startRoundBtn'),
             scoreboard: document.getElementById('scoreboard'),
             showFullResultsBtn: document.getElementById('showFullResultsBtn'),
             finalScoreboard: document.getElementById('finalScoreboard'),
@@ -648,14 +694,19 @@
             wordDisplay: document.getElementById('wordDisplay'),
             correctBtn: document.getElementById('correctBtn'),
             skipBtn: document.getElementById('skipBtn'),
-            nextRoundBtn: document.getElementById('nextRoundBtn'),
             winnerName: document.getElementById('winnerName'),
             playAgainBtn: document.getElementById('playAgainBtn'),
             gameModeRadios: document.querySelectorAll('input[name="gameMode"]'),
             roundsInput: document.getElementById('roundsInput'),
             roundsWarning: document.getElementById('roundsWarning'),
             roundsInfo: document.getElementById('roundsInfo'),
-            roundsSelector: document.getElementById('roundsSelector')
+            roundsSelector: document.getElementById('roundsSelector'),
+            currentRoundDisplay: document.getElementById('currentRoundDisplay'),
+            totalRoundsDisplay: document.getElementById('totalRoundsDisplay'),
+            gameRoundDisplay: document.getElementById('gameRoundDisplay'),
+            gameTotalRoundsDisplay: document.getElementById('gameTotalRoundsDisplay'),
+            nextExplainerName: document.getElementById('nextExplainerName'),
+            nextGuesserInfo: document.getElementById('nextGuesserInfo')
         };
 
         // Initialize the game
@@ -676,12 +727,12 @@
             
             elements.nextToCategoriesBtn.addEventListener('click', showCategoryScreen);
             elements.startGameBtn.addEventListener('click', startGame);
+            elements.startRoundBtn.addEventListener('click', startRound);
             elements.toggleAllCategoriesBtn.addEventListener('click', toggleAllCategories);
             elements.correctBtn.addEventListener('click', wordGuessed);
             elements.skipBtn.addEventListener('click', skipWord);
             elements.playAgainBtn.addEventListener('click', resetGame);
             elements.showFullResultsBtn.addEventListener('click', toggleFullResults);
-            elements.nextRoundBtn.addEventListener('click', startNextRound);
             
             // Game mode change
             elements.gameModeRadios.forEach(radio => {
@@ -1009,28 +1060,55 @@
                 };
             }
             
-            // Show game screen
+            // Show start round screen
             elements.categoryScreen.classList.remove('active');
-            elements.gameScreen.classList.add('active');
+            elements.startRoundScreen.classList.add('active');
+            
+            // Set round info
+            elements.totalRoundsDisplay.textContent = gameState.totalRounds;
+            elements.gameTotalRoundsDisplay.textContent = gameState.totalRounds;
             
             // Start the first round
-            startRound();
+            prepareRound();
+        }
+
+        // Prepare round (show who will explain next)
+        function prepareRound() {
+            gameState.currentRound++;
+            
+            // Update round display
+            elements.currentRoundDisplay.textContent = gameState.currentRound;
+            elements.gameRoundDisplay.textContent = gameState.currentRound;
+            
+            // Select player/team for this round
+            selectPlayerForRound();
+            
+            // Show who will explain next
+            elements.nextExplainerName.textContent = gameState.currentExplainer;
+            
+            if (gameState.gameMode === 'individual') {
+                elements.nextGuesserInfo.innerHTML = `
+                    <p>Игрок <span class="start-round-player">${gameState.currentGuesser}</span></p>
+                    <p>будет отгадывать слова</p>
+                `;
+            } else {
+                elements.nextGuesserInfo.innerHTML = `
+                    <p>для <span class="start-round-player">${gameState.currentTeam}</span></p>
+                `;
+            }
         }
 
         // Start a new round
         function startRound() {
-            gameState.currentRound++;
             gameState.guessedWords = [];
             gameState.waitingForNextRound = false;
             
-            // Hide next round button
-            elements.nextRoundBtn.style.display = 'none';
+            // Show game screen
+            elements.startRoundScreen.classList.remove('active');
+            elements.gameScreen.classList.add('active');
             
             // Update scoreboard
             updateScoreboard();
-            
-            // Select player/team for this round
-            selectPlayerForRound();
             
             // Start the timer
             startTimer();
@@ -1041,11 +1119,6 @@
             // Enable buttons
             elements.correctBtn.disabled = false;
             elements.skipBtn.disabled = false;
-        }
-
-        // Start next round manually
-        function startNextRound() {
-            startRound();
         }
 
         // Update the scoreboard display
@@ -1287,11 +1360,12 @@
                 return;
             }
             
-            // Set flag that we're waiting for next round
-            gameState.waitingForNextRound = true;
-            
-            // Show next round button
-            elements.nextRoundBtn.style.display = 'block';
+            // Show start round screen for next round
+            setTimeout(() => {
+                elements.gameScreen.classList.remove('active');
+                elements.startRoundScreen.classList.add('active');
+                prepareRound();
+            }, 2000);
         }
 
         // End the game and show winner
